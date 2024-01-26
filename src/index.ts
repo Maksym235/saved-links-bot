@@ -16,15 +16,19 @@ const bot = new Telegraf(BOT_TOKEN, {
 });
 
 bot.command('start', (ctx) => {
+  console.log(ctx.message.from);
   ctx.reply('Welcome');
 });
 
 bot.command('rdlink', async (ctx) => {
-  const { data, error }: any = await supabase.from('links').select('*');
+  const userId = ctx.message.from.id;
+  const { data, error }: any = await supabase
+    .from('links')
+    .select('*')
+    .eq('user_id', userId);
   if (error) {
     console.log(error);
   }
-  supabase.from('links').select();
   const randomIndex = Math.floor(Math.random() * data.length);
   await ctx.reply(
     `короткий опис: ${data[randomIndex].short_desc} \n \n посилання: ${data[randomIndex].link}`,
@@ -34,6 +38,7 @@ bot.command('rdlink', async (ctx) => {
 
 bot.on(message('text'), async (ctx) => {
   const userMessage = ctx.message.text;
+  const userId = ctx.message.from.id;
   const messageArr = userMessage.split(' ');
   if (!messageArr[0].includes('http') || !messageArr[0].includes('https')) {
     ctx.reply('Дай норм силку дурик');
@@ -44,12 +49,15 @@ bot.on(message('text'), async (ctx) => {
   const { error } = await supabase.from('links').insert({
     link: messageArr[0],
     short_desc: desc,
+    user_id: userId,
   });
   if (error) {
     console.log(error.message);
   }
   await ctx.reply('все супер, зберіг');
 });
+
+////////////////////////////////////////////////////////////////
 export const startVercel = async (req: VercelRequest, res: VercelResponse) => {
   await production(req, res, bot);
 };
