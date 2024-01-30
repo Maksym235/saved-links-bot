@@ -7,11 +7,15 @@
   "homepage": "https://github.com/sollidy/telegram-bot-vercel-boilerplate",
   "dependencies": {
     "@supabase/supabase-js": "^2.39.3",
+    "@types/bcryptjs": "^2.4.6",
     "@vercel/node": "^3.0.13",
+    "bcrypt": "^5.1.1",
+    "bcryptjs": "^2.4.3",
     "dotenv-cli": "^7.3.0",
     "telegraf": "^4.15.3"
   },
   "devDependencies": {
+    "@types/bcrypt": "^5.0.2",
     "@types/debug": "^4.1.12",
     "@types/node": "^20.10.5",
     "@vercel/ncc": "^0.38.1",
