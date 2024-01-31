@@ -1,5 +1,4 @@
-import { Telegraf, Scenes, Markup, session } from 'telegraf';
-import * as St from 'telegraf';
+import { Telegraf } from 'telegraf';
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { message } from 'telegraf/filters';
 import { createClient } from '@supabase/supabase-js';
@@ -10,13 +9,64 @@ const BOT_TOKEN = process.env.BOT_TOKEN || '';
 const ENVIRONMENT = process.env.NODE_ENV || '';
 const SUPABASE_URL = process.env.SUPABASE_URL || '';
 const SUPABASE_KEY = process.env.SUPABASE_KEY || '';
-
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+export interface Database {
+  public: {
+    Tables: {
+      categories: {
+        Row: {
+          // the data expected from .select()
+          id: number;
+          category_name: string;
+          user_id: number;
+        };
+        Insert: {
+          // the data to be passed to .insert()
+          id?: never; // generated columns must not be supplied
+          category_name: string; // `not null` columns with no default must be supplied
+          user_id: number; // nullable columns can be omitted
+        };
+      };
+      links: {
+        Row: {
+          id: number;
+          created_at: string;
+          link: string;
+          short_desc: string;
+          user_id: number;
+          categoty: number;
+        };
+        Insert: {
+          id?: never;
+          created_at?: never;
+          link: string;
+          short_desc: string;
+          user_id: number;
+          categoty: number;
+        };
+      };
+      users: {
+        Row: {
+          id: number;
+          username: string;
+          tg_id: number;
+        };
+        Insert: {
+          id?: never;
+          username: string;
+          tg_id: number;
+        };
+      };
+    };
+  };
+}
+const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_KEY);
 
 const bot = new Telegraf(BOT_TOKEN, {
   handlerTimeout: Infinity,
 });
 
+let user_message: string;
+let user_Id: number;
 bot.command('start', async (ctx) => {
   const { id, username } = ctx.message.from;
   ctx.reply('Welcome');
@@ -79,29 +129,67 @@ bot.action('category_add', async (ctx) => {
 // Команда rdlink повертає рандомене посилання
 bot.command('rdlink', async (ctx, next) => {
   const userId = ctx.message.from.id;
+  user_Id = userId;
+  const { data: ctgs, error: ctgsErr } = await supabase
+    .from('categories')
+    .select('category_name')
+    .eq('user_id', userId);
+  if (ctgsErr) {
+    console.log(ctgsErr);
+  }
+
+  const changedData = ctgs?.map((item) => {
+    return {
+      text: item.category_name,
+      callback_data: item.category_name + `_rnd`,
+    };
+  });
+  let arrayOfArrays = splitIntoArrays(changedData, 3);
 
   // 1. Вибір категорії з якої хочемо посилання
   await ctx.reply('Виберіть категорію', {
     reply_markup: {
-      force_reply: true,
+      inline_keyboard: arrayOfArrays,
     },
   });
 
   //2. Вибираємо з бази всі посилання
-  const { data, error }: any = await supabase
-    .from('links')
-    .select('*')
-    .eq('user_id', userId);
-  if (error) {
-    console.log(error);
-  }
-  // Вибираємо рандомний індекс
-  const randomIndex = Math.floor(Math.random() * data.length);
-  const parseData = data[randomIndex];
-  await ctx.reply(
-    `короткий опис: ${decrypt(parseData.short_desc)} \n \n посилання: ${decrypt(parseData.link)}`,
-  );
 });
+
+bot.command('get_links', async (ctx) => {
+  const userId = ctx.message.from.id;
+  user_Id = userId;
+  const { data: ctgs, error: ctgsErr } = await supabase
+    .from('categories')
+    .select('category_name')
+    .eq('user_id', userId);
+  if (ctgsErr) {
+    console.log(ctgsErr);
+  }
+
+  const changedData = ctgs?.map((item) => {
+    return {
+      text: item.category_name,
+      callback_data: item.category_name + `_get`,
+    };
+  });
+  let arrayOfArrays = splitIntoArrays(changedData, 3);
+
+  // 1. Вибір категорії з якої хочемо посилання
+  await ctx.reply('Виберіть категорію', {
+    reply_markup: {
+      inline_keyboard: arrayOfArrays,
+    },
+  });
+});
+
+function splitIntoArrays(objectArray: any, maxItems: any) {
+  let arrayOfArrays = [];
+  for (let i = 0; i < objectArray.length; i += maxItems) {
+    arrayOfArrays.push(objectArray.slice(i, i + maxItems));
+  }
+  return arrayOfArrays;
+}
 
 bot.on(message('text'), async (ctx) => {
   // Визначаю повідомлення і id користувача
@@ -137,72 +225,115 @@ bot.on(message('text'), async (ctx) => {
   }
   //========================================================
   // Відправляю користувачу клавіатуру для вибору в яку категорію додавати посилання
-  await ctx.reply(
-    'Виберіть категорію',
-    {
-      reply_markup: {
-        inline_keyboard: [
-          [
-            { text: 'Кіно', callback_data: 'movie_add' },
-            { text: 'Книги', callback_data: 'books_add' },
-          ],
-          [
-            { text: 'Button 3', callback_data: 'btn-1' },
-            { text: 'Button 4', callback_data: 'btn-2' },
-          ],
-        ],
-      },
+
+  user_message = userMessage;
+  user_Id = userId;
+  const { data, error } = await supabase
+    .from('categories')
+    .select('category_name')
+    .eq('user_id', userId);
+  if (error) {
+    console.log(error);
+  }
+
+  const changedData = data?.map((item) => {
+    return {
+      text: item.category_name,
+      callback_data: item.category_name + `_add`,
+    };
+  });
+  let arrayOfArrays = splitIntoArrays(changedData, 3);
+
+  await ctx.reply('Виберіть категорію', {
+    reply_markup: {
+      inline_keyboard: arrayOfArrays,
     },
-    //=========================================================
-    // Markup.inlineKeyboard([
-    //   Markup.button.callback('Кіно', 'movie_add'),
-    //   Markup.button.callback('Книги', 'books_add'),
-    //   Markup.button.callback('Робота', 'work_add'),
-    //   Markup.button.callback('Навчання', 'study_add'),
-    //   Markup.button.callback('Кіно', 'movie_add'),
-    //   Markup.button.callback('Книги', 'books_add'),
-    //   Markup.button.callback('Робота', 'work_add'),
-    //   Markup.button.callback('Навчання', 'study_add'),
-    // ]),
-  );
-
-  // const messageArr = userMessage.split(' ');
-  // if (!messageArr[0].includes('http') || !messageArr[0].includes('https')) {
-  //   ctx.reply('Дай норм силку дурик');
-  //   return;
-  // }
-
-  // const desc = messageArr.slice(1).join(' ');
-  // const { error } = await supabase.from('links').insert({
-  //   link: encrypt(messageArr[0]),
-  //   short_desc: encrypt(desc),
-  //   user_id: userId,
-  // });
-  // if (error) {
-  //   console.log(error.message);
-  // }
-  // await ctx.reply('все супер, зберіг');
+  });
+  //=========================================================
 });
-
 //===============================================================
+interface IAllLinks {
+  id: number;
+  created_at: any;
+  link: string;
+  short_desc: string;
+  user_id: number;
+  category: string;
+}
 // Обробка вибраної категорії
 bot.on('callback_query', async (ctx) => {
   //@ts-ignore
-  switch (ctx.callbackQuery.data) {
-    case 'movie_add':
-      await ctx.reply('Додати кіно');
-      break;
-    case 'books_add':
-      await ctx.reply('Додати книгу');
-      break;
-    case 'work_add':
-      await ctx.reply('Додати по роботі');
-      break;
-    case 'study_add':
-      await ctx.reply('Додати по навчанню');
-      break;
+  const cbData: string = ctx.callbackQuery.data;
+  const selectedCategory = cbData.slice(0, cbData.length - 4);
+  if (cbData.includes('_add')) {
+    const messageArr = user_message.split(' ');
+    if (!messageArr[0].includes('http') || !messageArr[0].includes('https')) {
+      ctx.reply('Дай норм силку дурик');
+      await ctx.answerCbQuery();
+      return;
+    }
+    const desc = messageArr.slice(1).join(' ');
+    const { error } = await supabase.from('links').insert({
+      link: encrypt(messageArr[0]),
+      short_desc: encrypt(desc),
+      user_id: user_Id,
+      category: selectedCategory,
+    });
+    if (error) {
+      console.log(error.message);
+    }
+    await ctx.reply('все супер, зберіг');
+    await ctx.answerCbQuery();
+    return;
+  } else if (cbData.includes('_rnd')) {
+    const { data, error }: any = await supabase
+      .from('links')
+      .select('*')
+      .eq('user_id', user_Id)
+      .eq('category', selectedCategory);
+    if (error) {
+      console.log(error);
+    }
+    console.log(data);
+    // Вибираємо рандомний індекс
+    if (!data.length) {
+      ctx.reply('В цій категорії немає збережених посилань');
+      await ctx.answerCbQuery();
+      return;
+    }
+    const randomIndex = Math.floor(Math.random() * data.length);
+    const parseData = data[randomIndex];
+    await ctx.reply(
+      `короткий опис: ${decrypt(parseData.short_desc)} \n \n посилання: ${decrypt(parseData.link)}`,
+    );
+    await ctx.answerCbQuery();
+    return;
+  } else if (cbData.includes('_get')) {
+    const { data, error }: any = await supabase
+      .from('links')
+      .select('*')
+      .eq('user_id', user_Id)
+      .eq('category', selectedCategory);
+    if (error) {
+      console.log(error.message);
+    }
+    // if (!data.length) {
+    //   ctx.reply('В цій категорії немає збережених посилань');
+    //   await ctx.answerCbQuery();
+    //   return;
+    // }
+    const allLinks =
+      `- ` +
+      data
+        ?.map(
+          (ctg: IAllLinks) =>
+            `[${decrypt(ctg.short_desc)}](${decrypt(ctg.link)})`,
+        )
+        .join('\n- ');
+    ctx.reply(allLinks, { parse_mode: 'Markdown' });
   }
-  await ctx.answerCbQuery();
+
+  return await ctx.answerCbQuery();
 });
 
 ////////////////////////////////////////////////////////////////
