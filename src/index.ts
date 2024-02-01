@@ -3,62 +3,17 @@ import { VercelRequest, VercelResponse } from '@vercel/node';
 import { message } from 'telegraf/filters';
 import { createClient } from '@supabase/supabase-js';
 import { development, production } from './core';
-import { encrypt, decrypt } from './crypto';
+import { Database } from './types/database';
 import 'dotenv/config';
+import { selectCategories } from './selectCategories';
+import { searchLink } from './searchLink';
+import { addCategory } from './addCategory';
+import { addLinks, getAllLinks, getRandomLink } from './callbackFunctions';
 const BOT_TOKEN = process.env.BOT_TOKEN || '';
 const ENVIRONMENT = process.env.NODE_ENV || '';
 const SUPABASE_URL = process.env.SUPABASE_URL || '';
 const SUPABASE_KEY = process.env.SUPABASE_KEY || '';
-export interface Database {
-  public: {
-    Tables: {
-      categories: {
-        Row: {
-          // the data expected from .select()
-          id: number;
-          category_name: string;
-          user_id: number;
-        };
-        Insert: {
-          // the data to be passed to .insert()
-          id?: never; // generated columns must not be supplied
-          category_name: string; // `not null` columns with no default must be supplied
-          user_id: number; // nullable columns can be omitted
-        };
-      };
-      links: {
-        Row: {
-          id: number;
-          created_at: string;
-          link: string;
-          short_desc: string;
-          user_id: number;
-          categoty: number;
-        };
-        Insert: {
-          id?: never;
-          created_at?: never;
-          link: string;
-          short_desc: string;
-          user_id: number;
-          categoty: number;
-        };
-      };
-      users: {
-        Row: {
-          id: number;
-          username: string;
-          tg_id: number;
-        };
-        Insert: {
-          id?: never;
-          username: string;
-          tg_id: number;
-        };
-      };
-    };
-  };
-}
+
 const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_KEY);
 
 const bot = new Telegraf(BOT_TOKEN, {
@@ -67,6 +22,7 @@ const bot = new Telegraf(BOT_TOKEN, {
 
 let user_message: string;
 let user_Id: number;
+
 bot.command('start', async (ctx) => {
   const { id, username } = ctx.message.from;
   ctx.reply('Welcome');
@@ -78,16 +34,6 @@ bot.command('start', async (ctx) => {
     console.log(error.message);
   }
 });
-// bot.on('callback_query', async (ctx) => {
-//   // Explicit usage
-//   await ctx.answerCbQuery();
-//   //@ts-ignore
-//   console.log(ctx.callbackQuery.data);
-//   await ctx.telegram.answerCbQuery(ctx.callbackQuery.id);
-
-//   // Using context shortcut
-//   await ctx.answerCbQuery();
-// });
 
 // Команда category
 // Показую весь список категорій і вставляю кнопку для додавання нової категорії
@@ -98,7 +44,10 @@ bot.command('categories', async (ctx) => {
     .from('categories')
     .select('*')
     .eq('user_id', userId);
-
+  if (error) {
+    ctx.reply(`Something went wrong`);
+    return;
+  }
   // переводимо масив об'єктів в рядок для відображення
   const allCategories =
     `-` +
@@ -119,6 +68,12 @@ bot.command('categories', async (ctx) => {
   });
 });
 
+bot.command('search_link', async (ctx) => {
+  ctx.reply(
+    `для пошуку певного посилання ми можете відправити короткий опис з приставкою -d. \nПриклад: -d Короткий опис`,
+  );
+});
+
 // Опрацювання кнопки категорій
 // Відправляє користувачу повідомлення в якому фортматі треба квказати нову категорію
 bot.action('category_add', async (ctx) => {
@@ -130,66 +85,15 @@ bot.action('category_add', async (ctx) => {
 bot.command('rdlink', async (ctx, next) => {
   const userId = ctx.message.from.id;
   user_Id = userId;
-  const { data: ctgs, error: ctgsErr } = await supabase
-    .from('categories')
-    .select('category_name')
-    .eq('user_id', userId);
-  if (ctgsErr) {
-    console.log(ctgsErr);
-  }
-
-  const changedData = ctgs?.map((item) => {
-    return {
-      text: item.category_name,
-      callback_data: item.category_name + `_rnd`,
-    };
-  });
-  let arrayOfArrays = splitIntoArrays(changedData, 3);
-
-  // 1. Вибір категорії з якої хочемо посилання
-  await ctx.reply('Виберіть категорію', {
-    reply_markup: {
-      inline_keyboard: arrayOfArrays,
-    },
-  });
-
-  //2. Вибираємо з бази всі посилання
+  await selectCategories(supabase, userId, '_rnd', ctx);
 });
 
 bot.command('get_links', async (ctx) => {
   const userId = ctx.message.from.id;
   user_Id = userId;
-  const { data: ctgs, error: ctgsErr } = await supabase
-    .from('categories')
-    .select('category_name')
-    .eq('user_id', userId);
-  if (ctgsErr) {
-    console.log(ctgsErr);
-  }
-
-  const changedData = ctgs?.map((item) => {
-    return {
-      text: item.category_name,
-      callback_data: item.category_name + `_get`,
-    };
-  });
-  let arrayOfArrays = splitIntoArrays(changedData, 3);
-
+  await selectCategories(supabase, userId, '_get', ctx);
   // 1. Вибір категорії з якої хочемо посилання
-  await ctx.reply('Виберіть категорію', {
-    reply_markup: {
-      inline_keyboard: arrayOfArrays,
-    },
-  });
 });
-
-function splitIntoArrays(objectArray: any, maxItems: any) {
-  let arrayOfArrays = [];
-  for (let i = 0; i < objectArray.length; i += maxItems) {
-    arrayOfArrays.push(objectArray.slice(i, i + maxItems));
-  }
-  return arrayOfArrays;
-}
 
 bot.on(message('text'), async (ctx) => {
   // Визначаю повідомлення і id користувача
@@ -197,30 +101,13 @@ bot.on(message('text'), async (ctx) => {
   const userId = ctx.message.from.id;
   // Перевірка чи повідомлення відноситься до створення категорій
   //===========================================================
-  if (userMessage.includes('-c')) {
-    const allMsg = userMessage.split(' ');
-    const category_name = allMsg.slice(1).join(' ');
-    // Перевірка чи є вже така категорія в базі
-    const { data: ctgs } = await supabase
-      .from('categories')
-      .select('*')
-      .eq('category_name', category_name);
+  if (userMessage.includes('-d')) {
+    await searchLink(supabase, userId, userMessage, ctx);
+    return;
+  }
 
-    if (ctgs?.length) {
-      ctx.reply('Така категорія вже існує');
-      return;
-    }
-    // Додоавання категорії
-    const { error } = await supabase.from('categories').insert({
-      category_name,
-      user_id: userId,
-    });
-    if (error) {
-      ctx.reply(`Error, please try again`);
-      console.log(error.message);
-      return;
-    }
-    ctx.reply('Категорія додана');
+  if (userMessage.includes('-c')) {
+    await addCategory(supabase, userId, userMessage, ctx);
     return;
   }
   //========================================================
@@ -228,112 +115,37 @@ bot.on(message('text'), async (ctx) => {
 
   user_message = userMessage;
   user_Id = userId;
-  const { data, error } = await supabase
-    .from('categories')
-    .select('category_name')
-    .eq('user_id', userId);
-  if (error) {
-    console.log(error);
-  }
-
-  const changedData = data?.map((item) => {
-    return {
-      text: item.category_name,
-      callback_data: item.category_name + `_add`,
-    };
-  });
-  let arrayOfArrays = splitIntoArrays(changedData, 3);
-
-  await ctx.reply('Виберіть категорію', {
-    reply_markup: {
-      inline_keyboard: arrayOfArrays,
-    },
-  });
+  await selectCategories(supabase, user_Id, '_add', ctx);
   //=========================================================
 });
 //===============================================================
-interface IAllLinks {
-  id: number;
-  created_at: any;
-  link: string;
-  short_desc: string;
-  user_id: number;
-  category: string;
-}
+
 // Обробка вибраної категорії
 bot.on('callback_query', async (ctx) => {
   //@ts-ignore
   const cbData: string = ctx.callbackQuery.data;
   const selectedCategory = cbData.slice(0, cbData.length - 4);
-  if (cbData.includes('_add')) {
-    const messageArr = user_message.split(' ');
-    if (!messageArr[0].includes('http') || !messageArr[0].includes('https')) {
-      ctx.reply('Дай норм силку дурик');
-      await ctx.answerCbQuery();
-      return;
-    }
-    const desc = messageArr.slice(1).join(' ');
-    const { error } = await supabase.from('links').insert({
-      link: encrypt(messageArr[0]),
-      short_desc: encrypt(desc),
-      user_id: user_Id,
-      category: selectedCategory,
-    });
-    if (error) {
-      console.log(error.message);
-    }
-    await ctx.reply('все супер, зберіг');
-    await ctx.answerCbQuery();
-    return;
-  } else if (cbData.includes('_rnd')) {
-    const { data, error }: any = await supabase
-      .from('links')
-      .select('*')
-      .eq('user_id', user_Id)
-      .eq('category', selectedCategory);
-    if (error) {
-      console.log(error);
-    }
-    console.log(data);
-    // Вибираємо рандомний індекс
-    if (!data.length) {
-      ctx.reply('В цій категорії немає збережених посилань');
-      await ctx.answerCbQuery();
-      return;
-    }
-    const randomIndex = Math.floor(Math.random() * data.length);
-    const parseData = data[randomIndex];
-    await ctx.reply(
-      `короткий опис: ${decrypt(parseData.short_desc)} \n \n посилання: ${decrypt(parseData.link)}`,
-    );
-    await ctx.answerCbQuery();
-    return;
-  } else if (cbData.includes('_get')) {
-    const { data, error }: any = await supabase
-      .from('links')
-      .select('*')
-      .eq('user_id', user_Id)
-      .eq('category', selectedCategory);
-    if (error) {
-      console.log(error.message);
-    }
-    // if (!data.length) {
-    //   ctx.reply('В цій категорії немає збережених посилань');
-    //   await ctx.answerCbQuery();
-    //   return;
-    // }
-    const allLinks =
-      `- ` +
-      data
-        ?.map(
-          (ctg: IAllLinks) =>
-            `[${decrypt(ctg.short_desc)}](${decrypt(ctg.link)})`,
-        )
-        .join('\n- ');
-    ctx.reply(allLinks, { parse_mode: 'Markdown' });
+  const method = cbData.slice(cbData.length - 4);
+  switch (method) {
+    case '_add':
+      await addLinks(supabase, user_Id, user_message, ctx, selectedCategory);
+      ctx.answerCbQuery();
+      break;
+    case '_rnd':
+      await getRandomLink(
+        supabase,
+        user_Id,
+        user_message,
+        ctx,
+        selectedCategory,
+      );
+      ctx.answerCbQuery();
+      break;
+    case '_get':
+      await getAllLinks(supabase, user_Id, user_message, ctx, selectedCategory);
+      ctx.answerCbQuery();
+      break;
   }
-
-  return await ctx.answerCbQuery();
 });
 
 ////////////////////////////////////////////////////////////////
