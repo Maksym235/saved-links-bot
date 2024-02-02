@@ -1,34 +1,14 @@
-# Telegram Bot Vercel Boilerplate
-
-Telegram Bot Vercel Boilerplate based on Node.js and [Telegraf](https://github.com/telegraf/telegraf) framework.
+# Saved your links bot
 
 This template inspired by [Telegram Bot Boilerplate](https://github.com/yakovlevyuri/telegram-bot-boilerplate) for easily deploy to [Vercel](https://vercel.com).
 
-[![Live Demo](https://img.shields.io/badge/Medium-12100E?style=for-the-badge&logo=medium&logoColor=white)](https://medium.com/@7rodma/deploy-a-serverless-telegram-chatbot-using-vercel-57665d942a58)
+## Start use
 
-## Before you start
+https://t.me/SaveYourDifferentLinks_bot
 
-First rename `.env-sample` file to `.env` and fill in all necessary values.
+1. /start - Команда для запуску бота
+2. /categories - Команда для перегляду всіх категорій
+3. Додайте нову категорію
+4. збережіть посилання у форматі https://google.com короткий опис
+5. /get_links - виберіть категорію і перегляньте збережені посилання
 
-```
-BOT_TOKEN="<YOUR_BOT_API_TOKEN>"
-```
-
-## Start your local server
-
-```
-yarn
-yarn dev
-```
-
-## Production
-
-You can fork this template and do the necessary changes you need. Then you when are done with your changes simply goto [vercel git import](https://vercel.com/import/git).
-
-Reference to [this update](https://vercel.com/docs/security/deployment-protection#migrating-to-standard-protection), you need turn off `Vercel Authentication`, Settings => Deployment Protection
-
-Feel free to create PR!
-
-## Demo
-
-You can see a working version of the bot at [@Node_api_m_bot](https://t.me/Node_api_m_bot)
