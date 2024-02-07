@@ -8,7 +8,13 @@ import 'dotenv/config';
 import { selectCategories } from './selectCategories';
 import { searchLink } from './searchLink';
 import { addCategory } from './addCategory';
-import { addLinks, getAllLinks, getRandomLink } from './callbackFunctions';
+import {
+  addLinks,
+  deleteLinkCallback,
+  getAllLinks,
+  getRandomLink,
+} from './callbackFunctions';
+import { deleteLink } from './deleteLink';
 const BOT_TOKEN = process.env.BOT_TOKEN || '';
 const ENVIRONMENT = process.env.NODE_ENV || '';
 const SUPABASE_URL = process.env.SUPABASE_URL || '';
@@ -38,7 +44,7 @@ bot.command('start', async (ctx) => {
 bot.command('help', (ctx) => {
   ctx.reply(
     `
-  # Довідник по командам
+# Довідник по командам
 
 # /start
 Команда яка запускає бота
@@ -106,7 +112,7 @@ bot.command('categories', async (ctx) => {
 
 bot.command('search_link', async (ctx) => {
   ctx.reply(
-    `для пошуку певного посилання ми можете відправити короткий опис з приставкою -d. \nПриклад: -d Короткий опис`,
+    `для пошуку певного посилання ми можете відправити короткий опис з приставкою -s. \nПриклад: -s Короткий опис`,
   );
 });
 
@@ -135,24 +141,24 @@ bot.on(message('text'), async (ctx) => {
   // Визначаю повідомлення і id користувача
   const userMessage = ctx.message.text;
   const userId = ctx.message.from.id;
-  // Перевірка чи повідомлення відноситься до створення категорій
-  //===========================================================
-  if (userMessage.includes('-d')) {
-    await searchLink(supabase, userId, userMessage, ctx);
-    return;
-  }
-
-  if (userMessage.includes('-c')) {
-    await addCategory(supabase, userId, userMessage, ctx);
-    return;
-  }
-  //========================================================
-  // Відправляю користувачу клавіатуру для вибору в яку категорію додавати посилання
+  const method = userMessage.slice(0, 2);
 
   user_message = userMessage;
   user_Id = userId;
-  await selectCategories(supabase, user_Id, '_add', ctx);
-  //=========================================================
+
+  switch (method) {
+    case '-s':
+      await searchLink(supabase, userId, userMessage, ctx);
+      break;
+    case '-c':
+      await addCategory(supabase, userId, userMessage, ctx);
+      break;
+    case '-d':
+      await deleteLink(supabase, userId, userMessage, ctx);
+      break;
+    default:
+      await selectCategories(supabase, user_Id, '_add', ctx);
+  }
 });
 //===============================================================
 
@@ -180,6 +186,9 @@ bot.on('callback_query', async (ctx) => {
     case '_get':
       await getAllLinks(supabase, user_Id, user_message, ctx, selectedCategory);
       ctx.answerCbQuery();
+      break;
+    case '_dlt':
+      await deleteLinkCallback(ctx);
       break;
   }
 });

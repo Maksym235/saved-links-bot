@@ -1,3 +1,4 @@
+import { Context } from 'telegraf';
 import { decrypt, encrypt } from './crypto';
 import { IAllLinks } from './types/allLinks';
 import { IGlobalFuncProps } from './types/functions';
@@ -83,8 +84,22 @@ export const getAllLinks: IGlobalFuncProps = async (
     data
       ?.map(
         (ctg: IAllLinks) =>
-          `[${decrypt(ctg.short_desc)}](${decrypt(ctg.link)})`,
+          `${ctg.id}, [${decrypt(ctg.short_desc)}](${decrypt(ctg.link)})`,
       )
       .join('\n- ');
-  ctx.reply(allLinks, { parse_mode: 'Markdown' });
+  ctx.reply(allLinks, {
+    parse_mode: 'Markdown',
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: 'Видалити посилання', callback_data: 'link_dlt' }],
+      ],
+    },
+  });
+};
+
+export const deleteLinkCallback = async (ctx: Context) => {
+  ctx.reply(
+    "Вкажіть будь ласка id посилання (В списку всіх посилань '- <id> <короткий опис>') з префіксом -d\nПриклад: -d 12",
+  );
+  return;
 };
