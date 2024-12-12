@@ -8,20 +8,24 @@ import 'dotenv/config';
 import { selectCategories } from './selectCategories';
 import { searchLink } from './searchLink';
 import { addCategory } from './addCategory';
+import mongoose from 'mongoose';
+import usersModel from './models/userModel';
 import {
   addLinks,
   deleteLinkCallback,
   getAllLinks,
   getRandomLink,
 } from './callbackFunctions';
+import { categoriesCmd, helpCmd, startCmd } from './commands';
 import { deleteLink } from './deleteLink';
 const BOT_TOKEN = process.env.BOT_TOKEN || '';
 const ENVIRONMENT = process.env.NODE_ENV || '';
 const SUPABASE_URL = process.env.SUPABASE_URL || '';
 const SUPABASE_KEY = process.env.SUPABASE_KEY || '';
+const DB_HOST = process.env.DATABASE_URL || '';
 
 const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_KEY);
-
+mongoose.connect(DB_HOST);
 const bot = new Telegraf(BOT_TOKEN, {
   handlerTimeout: Infinity,
 });
@@ -29,57 +33,13 @@ const bot = new Telegraf(BOT_TOKEN, {
 let user_message: string;
 let user_Id: number;
 
-bot.command('start', async (ctx) => {
-  const { id, username } = ctx.message.from;
-  await ctx.reply('Welcome');
-  const { error } = await supabase.from('users').insert({
-    username,
-    tg_id: id,
-  });
-  if (error) {
-    console.log(error.message);
-  }
-});
+bot.command('start', startCmd);
 
-bot.command('help', (ctx) => {
-  ctx.reply(
-    `[Посилання на документацію](https://github.com/Maksym235/saved-links-bot#readme)`,
-    { parse_mode: 'Markdown' },
-  );
-});
+bot.command('help', helpCmd);
 
 // Команда category
 // Показую весь список категорій і вставляю кнопку для додавання нової категорії
-bot.command('categories', async (ctx) => {
-  const userId = ctx.message.from.id;
-  // Фетчим всі категорії юзера
-  const { data: categories, error } = await supabase
-    .from('categories')
-    .select('*')
-    .eq('user_id', userId);
-  if (error) {
-    ctx.reply(`Something went wrong`);
-    return;
-  }
-  // переводимо масив об'єктів в рядок для відображення
-  const allCategories =
-    `-` +
-    categories
-      ?.map(
-        (ctg: { id: number; category_name: string; user_id: number }) =>
-          ctg.category_name,
-      )
-      .join('\n-');
-
-  //Повератаємо користувачу список з кнопкою
-  await ctx.reply(allCategories, {
-    reply_markup: {
-      inline_keyboard: [
-        [{ text: 'Додати нову', callback_data: 'category_add' }],
-      ],
-    },
-  });
-});
+bot.command('categories', categoriesCmd);
 
 bot.command('search_link', async (ctx) => {
   ctx.reply(
@@ -141,6 +101,7 @@ bot.on('callback_query', async (ctx) => {
   const cbData: string = ctx.callbackQuery.data;
   const selectedCategory = cbData.slice(0, cbData.length - 4);
   const method = cbData.slice(cbData.length - 4);
+  console.log(ctx);
   switch (method) {
     case '_add':
       await addLinks(supabase, user_Id, user_message, ctx, selectedCategory);

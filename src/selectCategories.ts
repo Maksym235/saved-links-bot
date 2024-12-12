@@ -1,3 +1,4 @@
+import categoriesModel from './models/categoryModel';
 import { IGlobalFuncProps } from './types/functions';
 function splitIntoArrays(objectArray: any, maxItems: any) {
   let arrayOfArrays = [];
@@ -13,18 +14,12 @@ export const selectCategories: IGlobalFuncProps = async (
   method,
   ctx,
 ) => {
-  const { data: ctgs, error: ctgsErr } = await supabase
-    .from('categories')
-    .select('category_name')
-    .eq('user_id', userId);
-  if (ctgsErr) {
-    console.log(ctgsErr);
-  }
+  const categories = await categoriesModel.find({ owner: userId });
 
-  const changedData = ctgs?.map((item: any) => {
+  const changedData = categories?.map((item: any) => {
     return {
-      text: item.category_name,
-      callback_data: item.category_name + method,
+      text: item.name,
+      callback_data: item.name + method,
     };
   });
   let arrayOfArrays = splitIntoArrays(changedData, 3);

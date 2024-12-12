@@ -2,6 +2,7 @@ import { Context } from 'telegraf';
 import { decrypt, encrypt } from './crypto';
 import { IAllLinks } from './types/allLinks';
 import { IGlobalFuncProps } from './types/functions';
+import linksModel from './models/linkModel';
 
 export const addLinks: IGlobalFuncProps = async (
   supabase,
@@ -17,15 +18,23 @@ export const addLinks: IGlobalFuncProps = async (
     return;
   }
   const desc = messageArr.slice(1).join(' ');
-  const { error } = await supabase.from('links').insert({
+  const newLink = {
     link: encrypt(messageArr[0]),
     short_desc: encrypt(desc),
-    user_id: user_Id,
+    owner: user_Id,
     category: selectedCategory,
-  });
-  if (error) {
-    console.log(error.message);
-  }
+  };
+  await linksModel.create(newLink);
+
+  // const { error } = await supabase.from('links').insert({
+  //   link: encrypt(messageArr[0]),
+  //   short_desc: encrypt(desc),
+  //   user_id: user_Id,
+  //   category: selectedCategory,
+  // });
+  // if (error) {
+  //   console.log(error.message);
+  // }
   await ctx.reply('все супер, зберіг');
   await ctx.answerCbQuery();
 };
@@ -66,14 +75,18 @@ export const getAllLinks: IGlobalFuncProps = async (
   ctx,
   selectedCategory,
 ) => {
-  const { data, error }: any = await supabase
-    .from('links')
-    .select('*')
-    .eq('user_id', user_Id)
-    .eq('category', selectedCategory);
-  if (error) {
-    console.log(error.message);
-  }
+  const links = await linksModel.find({
+    owner: user_Id,
+    category: selectedCategory,
+  });
+  // const { data, error }: any = await supabase
+  //   .from('links')
+  //   .select('*')
+  //   .eq('user_id', user_Id)
+  //   .eq('category', selectedCategory);
+  // if (error) {
+  //   console.log(error.message);
+  // }
   // if (!data.length) {
   //   ctx.reply('В цій категорії немає збережених посилань');
   //   await ctx.answerCbQuery();
@@ -81,9 +94,9 @@ export const getAllLinks: IGlobalFuncProps = async (
   // }
   const allLinks =
     `- ` +
-    data
+    links
       ?.map(
-        (ctg: IAllLinks) =>
+        (ctg: any) =>
           `${ctg.id}, [${decrypt(ctg.short_desc)}](${decrypt(ctg.link)})`,
       )
       .join('\n- ');
