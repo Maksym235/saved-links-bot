@@ -1,7 +1,8 @@
+import { Context } from 'telegraf';
 import categoriesModel from '../models/categoryModel';
 
-export const categoriesCmd = async (ctx: any) => {
-  const userId = ctx.message.from.id;
+export const categoriesCmd = async (ctx: Context) => {
+  const userId = ctx?.message?.from.id;
 
   const resp = (await categoriesModel.find({ owner: userId })) as any;
   const allCategories = `- ` + resp?.map((ctg: any) => ctg.name).join('\n-');

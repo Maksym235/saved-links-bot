@@ -1,4 +1,5 @@
 import { decrypt } from './crypto';
+import linksModel from './models/linkModel';
 import { IGlobalFuncProps } from './types/functions';
 
 function levenshteinDistance(s1: string, s2: string) {
@@ -40,21 +41,14 @@ function findClosestMatch(input: string, words: any) {
 }
 
 export const searchLink: IGlobalFuncProps = async (
-  supabase,
   userId,
   userMessage,
   ctx,
 ) => {
   const allMsg = userMessage.split(' ');
   const desc = allMsg.slice(1).join(' ');
-  const { data, error } = await supabase
-    .from('links')
-    .select('*')
-    .eq('user_id', userId);
-  if (error) {
-    ctx.reply('Something went wrong');
-    return;
-  }
+  const data = await linksModel.find({ owner: userId });
+
   const parse_links = data?.map((item: any) =>
     String(decrypt(item.short_desc)),
   );
@@ -66,7 +60,7 @@ export const searchLink: IGlobalFuncProps = async (
       (item: any) => decrypt(item.short_desc) === closestMatch,
     );
     ctx.reply(
-      `Короткий опис: ${decrypt(link.short_desc)} \n \nКатегорія: ${link.category} \n \nПосилання: ${decrypt(link.link)}`,
+      `Короткий опис: ${decrypt(link?.short_desc)} \n \nКатегорія: ${link?.category} \n \nПосилання: ${decrypt(link?.link)}`,
     );
     // console.log(`Можливо, ви шукаєте "${link}".`);
   } else {

@@ -5,7 +5,6 @@ import { IGlobalFuncProps } from './types/functions';
 import linksModel from './models/linkModel';
 
 export const addLinks: IGlobalFuncProps = async (
-  supabase,
   user_Id,
   user_message,
   ctx,
@@ -40,19 +39,17 @@ export const addLinks: IGlobalFuncProps = async (
 };
 
 export const getRandomLink: IGlobalFuncProps = async (
-  supabase,
   user_Id,
   user_message,
   ctx,
   selectedCategory,
 ) => {
-  const { data, error }: any = await supabase
-    .from('links')
-    .select('*')
-    .eq('user_id', user_Id)
-    .eq('category', selectedCategory);
-  if (error) {
-    console.log(error);
+  const data = await linksModel.find({
+    owner: user_Id,
+    category: selectedCategory,
+  });
+  if (!data) {
+    ctx.reply('error: 500');
   }
   // Вибираємо рандомний індекс
   if (!data.length) {
@@ -69,7 +66,6 @@ export const getRandomLink: IGlobalFuncProps = async (
 };
 
 export const getAllLinks: IGlobalFuncProps = async (
-  supabase,
   user_Id,
   user_message,
   ctx,
@@ -79,19 +75,7 @@ export const getAllLinks: IGlobalFuncProps = async (
     owner: user_Id,
     category: selectedCategory,
   });
-  // const { data, error }: any = await supabase
-  //   .from('links')
-  //   .select('*')
-  //   .eq('user_id', user_Id)
-  //   .eq('category', selectedCategory);
-  // if (error) {
-  //   console.log(error.message);
-  // }
-  // if (!data.length) {
-  //   ctx.reply('В цій категорії немає збережених посилань');
-  //   await ctx.answerCbQuery();
-  //   return;
-  // }
+
   const allLinks =
     `- ` +
     links

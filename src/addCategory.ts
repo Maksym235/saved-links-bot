@@ -2,7 +2,6 @@ import categoriesModel from './models/categoryModel';
 import { IGlobalFuncProps } from './types/functions';
 
 export const addCategory: IGlobalFuncProps = async (
-  supabase,
   userId,
   userMessage,
   ctx,

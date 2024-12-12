@@ -9,11 +9,11 @@ function splitIntoArrays(objectArray: any, maxItems: any) {
 }
 
 export const selectCategories: IGlobalFuncProps = async (
-  supabase,
   userId,
   method,
   ctx,
 ) => {
+  console.log(userId, method, ctx);
   const categories = await categoriesModel.find({ owner: userId });
 
   const changedData = categories?.map((item: any) => {

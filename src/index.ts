@@ -9,14 +9,21 @@ import { selectCategories } from './selectCategories';
 import { searchLink } from './searchLink';
 import { addCategory } from './addCategory';
 import mongoose from 'mongoose';
-import usersModel from './models/userModel';
 import {
   addLinks,
   deleteLinkCallback,
   getAllLinks,
   getRandomLink,
 } from './callbackFunctions';
-import { categoriesCmd, helpCmd, startCmd } from './commands';
+import {
+  categoriesCmd,
+  category_add,
+  get_links,
+  helpCmd,
+  rdlink,
+  search_link,
+  startCmd,
+} from './commands';
 import { deleteLink } from './deleteLink';
 const BOT_TOKEN = process.env.BOT_TOKEN || '';
 const ENVIRONMENT = process.env.NODE_ENV || '';
@@ -24,7 +31,6 @@ const SUPABASE_URL = process.env.SUPABASE_URL || '';
 const SUPABASE_KEY = process.env.SUPABASE_KEY || '';
 const DB_HOST = process.env.DATABASE_URL || '';
 
-const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_KEY);
 mongoose.connect(DB_HOST);
 const bot = new Telegraf(BOT_TOKEN, {
   handlerTimeout: Infinity,
@@ -37,39 +43,15 @@ bot.command('start', startCmd);
 
 bot.command('help', helpCmd);
 
-// Команда category
-// Показую весь список категорій і вставляю кнопку для додавання нової категорії
 bot.command('categories', categoriesCmd);
 
-bot.command('search_link', async (ctx) => {
-  ctx.reply(
-    `для пошуку певного посилання ми можете відправити короткий опис з приставкою -s. \nПриклад: -s Короткий опис`,
-  );
-});
+bot.command('search_link', search_link);
 
-// Опрацювання кнопки категорій
-// Відправляє користувачу повідомлення в якому фортматі треба квказати нову категорію
-bot.action('category_add', async (ctx) => {
-  ctx.reply(
-    `Вкажіть назву категорії з приставкою -c(Англійська). Приклад: "-c Фільми"`,
-  );
-  ctx.answerCbQuery();
-});
+bot.command('rdlink', rdlink);
 
-// Команда rdlink повертає рандомене посилання
-bot.command('rdlink', async (ctx, next) => {
-  const userId = ctx.message.from.id;
-  user_Id = userId;
-  await selectCategories(supabase, userId, '_rnd', ctx);
-});
+bot.command('get_links', get_links);
 
-bot.command('get_links', async (ctx) => {
-  const userId = ctx.message.from.id;
-  user_Id = userId;
-  await selectCategories(supabase, userId, '_get', ctx);
-  // 1. Вибір категорії з якої хочемо посилання
-});
-
+bot.action('category_add', category_add);
 bot.on(message('text'), async (ctx) => {
   // Визначаю повідомлення і id користувача
   const userMessage = ctx.message.text;
@@ -81,16 +63,16 @@ bot.on(message('text'), async (ctx) => {
 
   switch (method) {
     case '-s':
-      await searchLink(supabase, userId, userMessage, ctx);
+      await searchLink(userId, userMessage, ctx);
       break;
     case '-c':
-      await addCategory(supabase, userId, userMessage, ctx);
+      await addCategory(userId, userMessage, ctx);
       break;
     case '-d':
-      await deleteLink(supabase, userId, userMessage, ctx);
+      await deleteLink(userId, userMessage, ctx);
       break;
     default:
-      await selectCategories(supabase, user_Id, '_add', ctx);
+      await selectCategories(user_Id, '_add', ctx);
   }
 });
 //===============================================================
@@ -104,21 +86,15 @@ bot.on('callback_query', async (ctx) => {
   console.log(ctx);
   switch (method) {
     case '_add':
-      await addLinks(supabase, user_Id, user_message, ctx, selectedCategory);
+      await addLinks(user_Id, user_message, ctx, selectedCategory);
       ctx.answerCbQuery();
       break;
     case '_rnd':
-      await getRandomLink(
-        supabase,
-        user_Id,
-        user_message,
-        ctx,
-        selectedCategory,
-      );
+      await getRandomLink(user_Id, user_message, ctx, selectedCategory);
       ctx.answerCbQuery();
       break;
     case '_get':
-      await getAllLinks(supabase, user_Id, user_message, ctx, selectedCategory);
+      await getAllLinks(user_Id, user_message, ctx, selectedCategory);
       ctx.answerCbQuery();
       break;
     case '_dlt':

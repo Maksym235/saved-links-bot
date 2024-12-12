@@ -1,3 +1,9 @@
 export { startCmd } from './start';
 export { helpCmd } from './help';
 export { categoriesCmd } from './categories';
+export { search_link } from './searchLink';
+export { category_add } from './categoryAdd';
+export { rdlink } from './rdlink';
+export { get_links } from './getLinks';
+export { on_text } from './onText';
+export { callback_query } from './callbackQuery';
